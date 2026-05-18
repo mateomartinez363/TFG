@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>El Naranjo | Consulta Semantica</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <h1>El Naranjo</h1>
+        <p class="intro">
+          Consulta el catalogo, los pedidos y los envios de la tienda usando lenguaje natural.
+        </p>
+      </section>
+
+      <section class="panel">
+        <form id="query-form" class="query-form">
+          <label class="field">
+            <span>Pregunta</span>
+            <textarea
+              id="question"
+              name="question"
+              rows="4"
+              placeholder="Ejemplo: Quiero opciones saludables para desayunar, sin gluten y con fibra"
+              required
+            ></textarea>
+          </label>
+
+          <div class="form-row">
+            <label class="field field-small">
+              <span>Top K</span>
+              <select id="top-k" name="top_k">
+                <option value="3">3</option>
+                <option value="5" selected>5</option>
+                <option value="7">7</option>
+              </select>
+            </label>
+
+            <button type="submit" id="submit-button">Buscar contexto</button>
+          </div>
+        </form>
+
+        <p id="status" class="status"></p>
+      </section>
+
+      <section class="results-grid">
+        <article class="panel results-full">
+          <h2>Respuesta Generada</h2>
+          <div id="answer-output" class="answer-output">
+            Todavia no hay respuesta generada.
+          </div>
+        </article>
+
+        <article class="panel">
+          <h2>Contexto Recuperado</h2>
+          <pre id="context-output" class="context-output">Todavia no hay consulta ejecutada.</pre>
+        </article>
+
+        <article class="panel">
+          <h2>Resultados</h2>
+          <div id="results-output" class="results-output">
+            <p class="placeholder">Los fragmentos recuperados apareceran aqui.</p>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+  </body>
+</html>

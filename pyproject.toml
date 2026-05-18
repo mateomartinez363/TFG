@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "el-naranjo"
+version = "0.1.0"
+description = "MVP de e-commerce con Flask, PostgreSQL y RAG para el TFG de El Naranjo."
+requires-python = ">=3.11"
+dependencies = [
+    "Flask>=3.0,<4.0",
+    "Flask-Migrate>=4.0,<5.0",
+    "Flask-SQLAlchemy>=3.1,<4.0",
+    "openai>=1.30,<2.0",
+    "pgvector>=0.3,<0.4",
+    "psycopg[binary]>=3.1,<4.0",
+    "python-dotenv>=1.0,<2.0",
+]
+
+[tool.setuptools]
+
+[tool.setuptools.packages.find]
+include = ["app*"]

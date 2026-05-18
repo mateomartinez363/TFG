@@ -1,0 +1,21 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: el-naranjo-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-elnaranjo}
+      POSTGRES_USER: ${POSTGRES_USER:-elnaranjo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-elnaranjo}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-elnaranjo} -d ${POSTGRES_DB:-elnaranjo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
