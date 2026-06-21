@@ -8,37 +8,49 @@
   </head>
   <body>
     <div class="announcement-bar">
-      <p>Envio 24-48 h en peninsula · Compra minima 29 EUR · Atencion guiada por asistente</p>
+      <p>Envío 24-48 h en península · Compra mínima 29 EUR · Productos bio y funcionales</p>
     </div>
 
     <main class="page-shell">
       <header class="site-header">
         <div class="header-top">
-          <a href="/" class="brand-lockup" aria-label="El Naranjo">
-            <span class="brand-mark">EN</span>
-            <span class="brand-copy">
-              <strong>El Naranjo</strong>
-              <small>Alimentacion natural online</small>
-            </span>
-          </a>
+          <div class="header-left">
+            <a href="/" class="brand-lockup" aria-label="El Naranjo">
+              <img
+                src="{{ url_for('static', filename='images/el-naranjo-logo.svg') }}"
+                alt="El Naranjo"
+                class="brand-logo"
+              >
+            </a>
+
+            <nav class="header-primary-nav" aria-label="Enlaces principales">
+              <a href="#catalogo">Tienda</a>
+              <a href="#featured-product">Destacado</a>
+              <a href="#assistant">Asistente</a>
+            </nav>
+          </div>
 
           <form class="search-shell" role="search">
-            <label class="sr-only" for="catalog-search">Buscar en el catalogo</label>
-            <input id="catalog-search" type="search" placeholder="Buscar avena, matcha, proteina vegetal..." />
+            <label class="sr-only" for="catalog-search">Buscar en el catálogo</label>
+            <input id="catalog-search" type="search" placeholder="Buscar..." />
+            <button type="button" class="search-button">Buscar</button>
           </form>
 
-          <div class="header-actions">
-            <a href="#collections">Colecciones</a>
-            <a href="#assistant">Asistente</a>
-            <button type="button" class="cart-launch" data-open-cart>
+          <div class="header-right">
+            <div class="header-actions">
+              <a href="#catalogo">Comprar</a>
+              <a href="#assistant">Ayuda</a>
+            </div>
+            <span class="location-pill">Envío 24-48 h</span>
+            <a href="/carrito" class="cart-launch">
               Carrito
               <span id="cart-count" class="cart-badge">0</span>
-            </button>
+            </a>
           </div>
         </div>
 
-        <nav class="header-nav" aria-label="Categorias principales">
-          <a href="#catalogo" class="is-active">Todo</a>
+        <nav class="header-nav" aria-label="Categorías principales">
+          <a href="#catalogo" class="is-active">Todos los productos</a>
           {% for category in categories[:6] %}
           <button type="button" class="nav-filter" data-filter="{{ category.slug }}">{{ category.name }}</button>
           {% endfor %}
@@ -47,31 +59,37 @@
 
       <section class="hero-split">
         <div class="hero-editorial">
-          <p class="eyebrow">Coleccion destacada</p>
-          <h1>Despensa natural para desayunos, snacks y rituales diarios.</h1>
+          <p class="eyebrow">Compra online</p>
+          <h1>Tu tienda natural, pensada como ecommerce.</h1>
           <p class="hero-text">
-            Una portada de tienda real: colecciones, fichas de producto, carrito y una ayuda conversacional
-            que solo aparece cuando el cliente la necesita.
+            Compra básicos de despensa, snacks saludables y suplementos con una navegación
+            clara, precios visibles y productos fáciles de comparar.
           </p>
 
           <div class="hero-actions">
             <a href="#catalogo" class="primary-link">Comprar ahora</a>
-            <a href="#assistant" class="secondary-link">Usar asistente</a>
+            <a href="#featured-product" class="secondary-link">Ver destacado</a>
           </div>
 
           <dl class="hero-stats">
             <div>
-              <dt>Productos visibles</dt>
+              <dt>Productos</dt>
               <dd>{{ stats.product_count }}</dd>
             </div>
             <div>
-              <dt>Categorias</dt>
+              <dt>Categorías</dt>
               <dd>{{ stats.category_count }}</dd>
             </div>
           </dl>
+
+          <div class="hero-highlights" aria-label="Ventajas de compra">
+            <span>Catálogo claro</span>
+            <span>Etiquetas visibles</span>
+            <span>Envío rápido</span>
+          </div>
         </div>
 
-        <aside class="hero-feature">
+        <aside id="featured-product" class="hero-feature">
           {% set featured = featured_products[0] if featured_products else None %}
           {% if featured %}
           <div class="feature-media media-{{ featured.image_theme }}">
@@ -91,53 +109,71 @@
             {% endif %}
           </div>
           <div class="feature-copy">
-            <p class="eyebrow">Favorito de la semana</p>
-            <h2>{{ featured.name }}</h2>
-            <p>{{ featured.description }}</p>
+            <p class="eyebrow">Producto destacado</p>
+            <h2 title="{{ featured.name }}">{{ featured.display_name }}</h2>
+            <p>{{ featured.short_description }}</p>
             <div class="feature-meta">
-              <strong>{{ featured.price_label }}</strong>
-              <span>{{ featured.stock_label }}</span>
+              <div>
+                <strong>{{ featured.price_label }}</strong>
+                <span>{{ featured.stock_label }}</span>
+              </div>
+              <button
+                type="button"
+                class="add-to-cart"
+                data-product-id="{{ featured.id }}"
+                data-product-name="{{ featured.name }}"
+                data-product-price="{{ featured.price }}"
+              >
+                Añadir
+              </button>
             </div>
           </div>
           {% else %}
           <div class="empty-state">
             <h3>No hay producto destacado</h3>
-            <p>Ejecuta el seed para poblar el escaparate principal.</p>
+            <p>El catálogo estará disponible en cuanto se carguen los productos.</p>
           </div>
           {% endif %}
         </aside>
       </section>
 
-      <section id="collections" class="collection-band">
-        {% for category in categories[:4] %}
-        <article class="collection-card" data-filter="{{ category.slug }}">
-          <p class="eyebrow">Coleccion</p>
-          <h2>{{ category.name }}</h2>
-          <p>{{ category.description }}</p>
-          <span>{{ category.count }} productos</span>
+      <section class="trust-strip" aria-label="Puntos clave de la tienda">
+        <article>
+          <p class="eyebrow">Compra fácil</p>
+          <h2>Encuentra antes lo que buscas</h2>
+          <p>Navegación directa por categorías y un listado de producto mucho más limpio.</p>
         </article>
-        {% endfor %}
+        <article>
+          <p class="eyebrow">Selección</p>
+          <h2>Etiquetas útiles a primera vista</h2>
+          <p>Bio, vegano o sin gluten visibles sin tener que abrir cada ficha.</p>
+        </article>
+        <article>
+          <p class="eyebrow">Entrega</p>
+          <h2>Precios y stock claros</h2>
+          <p>Información comercial en el sitio correcto para comprar con menos fricción.</p>
+        </article>
       </section>
 
       <section class="promo-banner">
         <div>
-          <p class="eyebrow">Seleccion editorial</p>
-          <h2>Ingredientes sencillos, etiquetas claras y decisiones de compra rapidas.</h2>
+          <p class="eyebrow">Categorías principales</p>
+          <h2>Compra por tipo de producto, no por bloques decorativos.</h2>
         </div>
         <div class="promo-points">
-          <span>Bio</span>
-          <span>Vegano</span>
-          <span>Sin gluten</span>
+          {% for category in categories[:4] %}
+          <button type="button" class="category-pill" data-filter="{{ category.slug }}">{{ category.name }}</button>
+          {% endfor %}
         </div>
       </section>
 
       <section id="catalogo" class="catalog-shell">
         <div class="section-head">
           <div>
-            <p class="eyebrow">Productos destacados</p>
-            <h2>Lo mas vendido del catalogo</h2>
+            <p class="eyebrow">Catálogo</p>
+            <h2>Productos listos para comprar</h2>
           </div>
-          <button type="button" class="catalog-summary" data-filter="all">Ver todo el catalogo</button>
+          <button type="button" class="catalog-summary" data-filter="all">{{ stats.product_count }} productos</button>
         </div>
 
         {% if products %}
@@ -163,8 +199,8 @@
 
             <div class="product-body">
               <p class="product-brand">{{ product.brand }}</p>
-              <h3>{{ product.name }}</h3>
-              <p class="product-description">{{ product.description }}</p>
+              <h3 title="{{ product.name }}">{{ product.display_name }}</h3>
+              <p class="product-description">{{ product.short_description }}</p>
 
               <div class="badge-row">
                 {% for badge in product.badges %}
@@ -184,7 +220,7 @@
                   data-product-name="{{ product.name }}"
                   data-product-price="{{ product.price }}"
                 >
-                  Anadir al carrito
+                  Añadir al carrito
                 </button>
               </div>
             </div>
@@ -194,61 +230,55 @@
         {% else %}
         <div class="empty-state">
           <h3>No hay productos listos para mostrar</h3>
-          <p>Ejecuta el seed de datos para convertir la home en un ecommerce con catalogo real.</p>
+          <p>El escaparate aparecerá en cuanto se cargue el catálogo.</p>
         </div>
         {% endif %}
       </section>
 
-      <section class="support-grid">
-        <section class="cart-panel" id="cart-panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">Carrito</p>
-              <h2>Cesta actual</h2>
-            </div>
-            <button type="button" class="panel-action" data-open-cart>Cerrar</button>
-          </div>
-
-          <div id="cart-items" class="cart-items">
-            <p class="placeholder">Tu carrito esta vacio.</p>
-          </div>
-
-          <div class="cart-summary">
-            <div>
-              <span>Total</span>
-              <strong id="cart-total">0.00 EUR</strong>
-            </div>
-            <button type="button" class="checkout-button">Ir al checkout</button>
-          </div>
-        </section>
-
+      <section class="support-grid support-grid-wide">
         <section id="assistant" class="assistant-shell">
           <div class="panel-head">
             <div>
-              <p class="eyebrow">Compra asistida</p>
-              <h2>Ayuda al cliente a encontrar el producto correcto</h2>
-              <p class="assistant-intro">
-                El asistente ya no ocupa la portada. Queda como ayuda puntual para resolver dudas
-                concretas de catalogo, dietas o preferencias.
-              </p>
+              <p class="eyebrow">Asistente de compra</p>
+              <h2>Consulta el catálogo sin salir de la tienda</h2>
             </div>
-            <button type="button" id="speak-button" class="panel-action" disabled>Escuchar respuesta</button>
+            <div class="assistant-actions">
+              <button
+                type="button"
+                id="listen-button"
+                class="icon-button"
+                aria-label="Hablar pregunta"
+                title="Hablar pregunta"
+              >
+                <span aria-hidden="true">🎤</span>
+              </button>
+              <button
+                type="button"
+                id="speak-button"
+                class="icon-button"
+                aria-label="Reproducir respuesta"
+                title="Reproducir respuesta"
+                disabled
+              >
+                <span aria-hidden="true">🔊</span>
+              </button>
+            </div>
           </div>
 
           <div class="prompt-bar" aria-label="Consultas sugeridas">
             <button type="button" class="prompt-chip" data-question="Quiero opciones saludables para desayunar, sin gluten y con fibra">Desayuno sin gluten</button>
-            <button type="button" class="prompt-chip" data-question="Que productos veganos ricos en proteina me recomiendas?">Proteina vegana</button>
-            <button type="button" class="prompt-chip" data-question="Que bebidas o infusiones naturales tienen un perfil funcional?">Bebidas funcionales</button>
+            <button type="button" class="prompt-chip" data-question="¿Qué productos veganos ricos en proteína me recomiendas?">Proteína vegana</button>
+            <button type="button" class="prompt-chip" data-question="¿Qué bebidas o infusiones naturales tienen un perfil funcional?">Bebidas funcionales</button>
           </div>
 
           <form id="query-form" class="query-form">
             <label class="field">
-              <span>Pregunta</span>
+              <span>Consulta</span>
               <textarea
                 id="question"
                 name="question"
                 rows="4"
-                placeholder="Ejemplo: Quiero opciones saludables para desayunar, sin gluten y con fibra"
+                placeholder="Ejemplo: Busco algo vegano, rico en proteína y fácil para desayunar"
                 required
               ></textarea>
             </label>
@@ -272,27 +302,27 @@
           <div class="assistant-results">
             <article class="panel panel-soft results-full">
               <div class="panel-subhead">
-                <p class="eyebrow">Respuesta</p>
-                <h3>Respuesta generada</h3>
+                <p class="eyebrow">Sugerencia</p>
+                <h3>Respuesta del asistente</h3>
               </div>
-              <div id="answer-output" class="answer-output">Todavia no hay respuesta generada.</div>
+              <div id="answer-output" class="answer-output">Todavía no hay respuesta disponible.</div>
             </article>
 
             <article class="panel panel-soft">
               <div class="panel-subhead">
-                <p class="eyebrow">Contexto</p>
-                <h3>Contexto recuperado</h3>
+                <p class="eyebrow">Base de respuesta</p>
+                <h3>Información utilizada</h3>
               </div>
-              <pre id="context-output" class="context-output">Todavia no hay consulta ejecutada.</pre>
+              <pre id="context-output" class="context-output">Aún no se ha realizado ninguna consulta.</pre>
             </article>
 
             <article class="panel panel-soft">
               <div class="panel-subhead">
-                <p class="eyebrow">Ranking</p>
-                <h3>Fragmentos recuperados</h3>
+                <p class="eyebrow">Resultados</p>
+                <h3>Productos y referencias encontradas</h3>
               </div>
               <div id="results-output" class="results-output">
-                <p class="placeholder">Los fragmentos recuperados apareceran aqui.</p>
+                <p class="placeholder">Los resultados relacionados aparecerán aquí.</p>
               </div>
             </article>
           </div>

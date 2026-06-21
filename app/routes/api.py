@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 
 from app.services.llm_service import build_answer
 from app.services.rag_service import build_context_block, search_semantic_chunks
+from app.services.transcription_service import transcribe_audio_bytes
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -56,3 +57,23 @@ def query():
             ],
         }
     )
+
+
+@api_bp.route("/transcribe", methods=["POST"])
+def transcribe():
+    audio_file = request.files.get("audio")
+    if not audio_file or not audio_file.filename:
+        return jsonify({"error": "Debes adjuntar un archivo de audio en el campo 'audio'."}), 400
+
+    try:
+        transcript = transcribe_audio_bytes(
+            audio_file.read(),
+            filename=audio_file.filename,
+            mime_type=audio_file.mimetype,
+        )
+    except (ValueError, RuntimeError) as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception:
+        return jsonify({"error": "No se ha podido transcribir el audio en este momento."}), 502
+
+    return jsonify({"text": transcript})

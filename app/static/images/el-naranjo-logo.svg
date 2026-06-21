@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 120" role="img" aria-labelledby="logoTitle logoDesc">
+  <title id="logoTitle">El Naranjo</title>
+  <desc id="logoDesc">Logo de El Naranjo con isotipo rojo y texto Tienda de alimentos.</desc>
+  <rect width="540" height="120" fill="#f7f3ef"/>
+  <circle cx="61" cy="60" r="45" fill="#ed1111"/>
+  <g fill="#fff">
+    <path d="M58 83c0-9 1-20 4-30 2-8 3-16 4-22 2 5 3 12 5 20 3 11 5 22 5 32h-6c0-8-1-16-3-23-1 8-2 15-2 23z"/>
+    <circle cx="49" cy="46" r="10"/>
+    <circle cx="61" cy="39" r="12"/>
+    <circle cx="73" cy="46" r="9"/>
+    <circle cx="41" cy="57" r="8"/>
+    <circle cx="53" cy="56" r="10"/>
+    <circle cx="65" cy="54" r="11"/>
+    <circle cx="77" cy="57" r="8"/>
+    <circle cx="47" cy="67" r="7"/>
+    <circle cx="59" cy="65" r="9"/>
+    <circle cx="71" cy="66" r="7"/>
+    <path d="M31 82c13-4 26-6 39-6 8 0 16 1 24 3-20 0-40 2-60 8z"/>
+  </g>
+  <g font-family="Georgia, 'Times New Roman', serif">
+    <text x="113" y="70" fill="#734533" font-size="62" font-weight="700">El Naranjo</text>
+    <text x="115" y="103" fill="#c39b78" font-size="28">Tienda de alimentos</text>
+    <text x="500" y="83" fill="#734533" font-size="16">®</text>
+  </g>
+</svg>

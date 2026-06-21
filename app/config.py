@@ -23,3 +23,4 @@ class Config:
     EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
     EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
     RESPONSE_MODEL = os.getenv("RESPONSE_MODEL", "gpt-4.1-mini")
+    TRANSCRIPTION_MODEL = os.getenv("TRANSCRIPTION_MODEL", "whisper-1")

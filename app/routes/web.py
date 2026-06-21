@@ -23,8 +23,29 @@ def resolve_product_image(product: Product) -> str | None:
     return None
 
 
-@web_bp.route("/")
-def home():
+def truncate_text(text: str | None, max_length: int) -> str:
+    if not text:
+        return ""
+
+    cleaned = " ".join(text.split())
+    if len(cleaned) <= max_length:
+        return cleaned
+
+    return f"{cleaned[: max_length - 3].rstrip(' ,.;:-')}..."
+
+
+def shorten_product_name(name: str, brand: str | None) -> str:
+    cleaned = " ".join(name.split())
+    if brand:
+        brand_lower = brand.casefold()
+        cleaned = cleaned.removeprefix(f"{brand} ").strip()
+        if cleaned.casefold().startswith(brand_lower):
+            cleaned = cleaned[len(brand):].strip(" ,-")
+
+    return truncate_text(cleaned or name, 42)
+
+
+def build_storefront_context() -> dict:
     categories: list[dict] = []
     products: list[dict] = []
     featured_products: list[dict] = []
@@ -89,8 +110,10 @@ def home():
             {
                 "id": product.id,
                 "name": product.name,
+                "display_name": shorten_product_name(product.name, product.brand),
                 "brand": product.brand,
                 "description": product.description,
+                "short_description": truncate_text(product.description, 96),
                 "unit_size": product.unit_size,
                 "price": float(product.price),
                 "price_label": f"{float(product.price):.2f} EUR",
@@ -111,18 +134,27 @@ def home():
             {
                 "name": category.name,
                 "slug": category.slug,
-                "description": category.description,
+                "description": truncate_text(category.description, 72),
                 "count": category.product_count,
             }
         )
 
-    return render_template(
-        "index.html",
-        categories=categories,
-        products=products,
-        featured_products=featured_products,
-        stats={
+    return {
+        "categories": categories,
+        "products": products,
+        "featured_products": featured_products,
+        "stats": {
             "product_count": len(products),
             "category_count": len(categories),
         },
-    )
+    }
+
+
+@web_bp.route("/")
+def home():
+    return render_template("index.html", **build_storefront_context())
+
+
+@web_bp.route("/carrito")
+def cart():
+    return render_template("cart.html", **build_storefront_context())

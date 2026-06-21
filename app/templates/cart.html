@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>El Naranjo | Carrito</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  </head>
+  <body>
+    <div class="announcement-bar">
+      <p>Envío 24-48 h en península · Compra mínima 29 EUR · Productos bio y funcionales</p>
+    </div>
+
+    <main class="page-shell">
+      <header class="site-header">
+        <div class="header-top">
+          <div class="header-left">
+            <a href="/" class="brand-lockup" aria-label="El Naranjo">
+              <img
+                src="{{ url_for('static', filename='images/el-naranjo-logo.svg') }}"
+                alt="El Naranjo"
+                class="brand-logo"
+              >
+            </a>
+
+            <nav class="header-primary-nav" aria-label="Enlaces principales">
+              <a href="/">Tienda</a>
+              <a href="#cart-summary">Resumen</a>
+              <a href="/">Locales</a>
+            </nav>
+          </div>
+
+          <form class="search-shell" role="search">
+            <label class="sr-only" for="cart-search">Buscar en el catálogo</label>
+            <input id="cart-search" type="search" placeholder="Buscar..." />
+            <button type="button" class="search-button">Buscar</button>
+          </form>
+
+          <div class="header-right">
+            <div class="header-actions">
+              <a href="/">Seguir comprando</a>
+              <a href="#cart-summary">Pedido</a>
+            </div>
+            <a href="/" class="location-pill">Tiendas Montevideo</a>
+            <a href="/carrito" class="cart-launch">
+              Carrito
+              <span id="cart-count" class="cart-badge">0</span>
+            </a>
+          </div>
+        </div>
+
+        <nav class="header-nav" aria-label="Accesos de carrito">
+          <a href="/" class="is-active">Seguir comprando</a>
+          <a href="#cart-summary">Resumen del pedido</a>
+        </nav>
+      </header>
+
+      <section class="cart-hero">
+        <div>
+          <p class="eyebrow">Tu selección</p>
+          <h1>Una cesta clara, rápida y lista para cerrar.</h1>
+          <p class="hero-text">
+            Ajusta cantidades, revisa el envío y completa tu pedido sin perder de vista
+            los productos destacados de la semana.
+          </p>
+        </div>
+
+        <div class="cart-hero-card">
+          <span>Envío gratis</span>
+          <strong>A partir de 49.00 EUR</strong>
+          <p>Te indicamos cuánto falta para desbloquearlo.</p>
+        </div>
+      </section>
+
+      <section class="cart-layout">
+        <section class="cart-page-shell">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Carrito</p>
+              <h2>Productos añadidos</h2>
+            </div>
+            <a href="/" class="panel-action">Volver al catálogo</a>
+          </div>
+
+          <div id="cart-page-items" class="cart-page-items">
+            <div class="empty-state">
+              <h3>Tu carrito está vacío</h3>
+              <p>Añade productos desde el catálogo para verlos aquí.</p>
+            </div>
+          </div>
+        </section>
+
+        <aside class="cart-sidebar" id="cart-summary">
+          <section class="cart-summary-card">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Resumen</p>
+                <h2>Total del pedido</h2>
+              </div>
+            </div>
+
+            <div class="summary-rows">
+              <div class="summary-row">
+                <span>Subtotal</span>
+                <strong id="summary-subtotal">0.00 EUR</strong>
+              </div>
+              <div class="summary-row">
+                <span>Envío</span>
+                <strong id="summary-shipping">4.90 EUR</strong>
+              </div>
+              <div class="summary-row summary-row-total">
+                <span>Total</span>
+                <strong id="cart-total">0.00 EUR</strong>
+              </div>
+            </div>
+
+            <div class="shipping-progress">
+              <div class="shipping-progress-bar">
+                <span id="shipping-progress-fill"></span>
+              </div>
+              <p id="shipping-progress-text" class="placeholder">
+                Añade productos para calcular tu envío.
+              </p>
+            </div>
+
+            <button type="button" class="checkout-button cart-checkout-button">
+              Finalizar compra
+            </button>
+          </section>
+
+          <section class="cart-benefits">
+            <article>
+              <p class="eyebrow">Pedido cuidado</p>
+              <h3>Preparación rápida</h3>
+              <p>Salida en 24-48 h con embalaje protegido para alimentación y suplementos.</p>
+            </article>
+            <article>
+              <p class="eyebrow">Selección</p>
+              <h3>Productos útiles</h3>
+              <p>Catálogo enfocado en básicos diarios, rituales funcionales y snack saludable.</p>
+            </article>
+          </section>
+        </aside>
+      </section>
+
+      <section class="catalog-shell cart-recommendations">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Sigue explorando</p>
+            <h2>Productos destacados para completar la cesta</h2>
+          </div>
+          <a href="/" class="catalog-summary">Ver todo el catálogo</a>
+        </div>
+
+        {% if featured_products %}
+        <div class="product-grid">
+          {% for product in featured_products %}
+          <article class="product-card" data-category="{{ product.category_slug }}" data-name="{{ product.name|lower }}">
+            <div class="product-media media-{{ product.image_theme }}">
+              <span class="media-tag">{{ product.category_name }}</span>
+              {% if product.image_url %}
+              <img
+                src="{{ url_for('static', filename=product.image_url) }}"
+                alt="{{ product.name }}"
+                class="product-photo"
+              >
+              {% else %}
+              <div class="product-packshot">
+                <span>{{ product.brand }}</span>
+                <strong>{{ product.name }}</strong>
+                <small>{{ product.unit_size }}</small>
+              </div>
+              {% endif %}
+            </div>
+
+            <div class="product-body">
+              <p class="product-brand">{{ product.brand }}</p>
+              <h3 title="{{ product.name }}">{{ product.display_name }}</h3>
+              <p class="product-description">{{ product.short_description }}</p>
+
+              <div class="badge-row">
+                {% for badge in product.badges %}
+                <span class="product-badge">{{ badge }}</span>
+                {% endfor %}
+              </div>
+
+              <div class="product-meta">
+                <div>
+                  <strong>{{ product.price_label }}</strong>
+                  <span>{{ product.stock_label }}</span>
+                </div>
+                <button
+                  type="button"
+                  class="add-to-cart"
+                  data-product-id="{{ product.id }}"
+                  data-product-name="{{ product.name }}"
+                  data-product-price="{{ product.price }}"
+                >
+                  Añadir al carrito
+                </button>
+              </div>
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+  </body>
+</html>
