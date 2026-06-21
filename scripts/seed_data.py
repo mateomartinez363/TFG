@@ -442,12 +442,14 @@ def seed_products(categories: dict[str, Category]) -> dict[str, Product]:
     products: dict[str, Product] = {}
 
     for item in PRODUCT_DATA:
+        slug = slugify(item["name"])
         product = Product(
             category=categories[item["category"]],
             sku=item["sku"],
             name=item["name"],
-            slug=slugify(item["name"]),
+            slug=slug,
             brand=item["brand"],
+            image_url=f"images/products/{slug}.jpeg",
             description=item["description"],
             ingredients=item["ingredients"],
             unit_size=item["unit_size"],

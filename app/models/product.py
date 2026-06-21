@@ -14,6 +14,7 @@ class Product(db.Model):
     name = db.Column(db.String(160), nullable=False)
     slug = db.Column(db.String(180), unique=True, nullable=False)
     brand = db.Column(db.String(120), nullable=False)
+    image_url = db.Column(db.String(255), nullable=True)
     description = db.Column(db.Text, nullable=True)
     ingredients = db.Column(db.Text, nullable=True)
     unit_size = db.Column(db.String(60), nullable=False)
