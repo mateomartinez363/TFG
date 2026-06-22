@@ -24,3 +24,5 @@ class Config:
     EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
     RESPONSE_MODEL = os.getenv("RESPONSE_MODEL", "gpt-4.1-mini")
     TRANSCRIPTION_MODEL = os.getenv("TRANSCRIPTION_MODEL", "whisper-1")
+    TTS_MODEL = os.getenv("TTS_MODEL", "gpt-4o-mini-tts")
+    TTS_VOICE = os.getenv("TTS_VOICE", "alloy")

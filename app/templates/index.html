@@ -236,42 +236,33 @@
       </section>
 
       <section class="support-grid support-grid-wide">
-        <section id="assistant" class="assistant-shell">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">Asistente de compra</p>
-              <h2>Consulta el catálogo sin salir de la tienda</h2>
-            </div>
-            <div class="assistant-actions">
+        <section id="assistant" class="assistant-shell assistant-shell-compact" aria-label="Asistente de compra">
+          <div class="voice-assistant-shell">
+            <div class="voice-assistant-feedback" aria-live="polite">
+              <p id="status" class="status voice-assistant-status">Toca el micrófono para hablar.</p>
+              <p id="voice-answer-preview" class="voice-answer-preview">La respuesta del asistente aparecerá aquí.</p>
               <button
                 type="button"
-                id="listen-button"
-                class="icon-button"
-                aria-label="Hablar pregunta"
-                title="Hablar pregunta"
-              >
-                <span aria-hidden="true">🎤</span>
-              </button>
-              <button
-                type="button"
-                id="speak-button"
-                class="icon-button"
-                aria-label="Reproducir respuesta"
-                title="Reproducir respuesta"
+                id="replay-button"
+                class="voice-replay-button"
+                hidden
                 disabled
               >
-                <span aria-hidden="true">🔊</span>
+                Reproducir respuesta
               </button>
             </div>
+            <button
+              type="button"
+              id="listen-button"
+              class="voice-assistant-trigger"
+              aria-label="Toca para hablar con el asistente"
+              title="Toca para hablar"
+            >
+              <span aria-hidden="true">🎤</span>
+            </button>
           </div>
 
-          <div class="prompt-bar" aria-label="Consultas sugeridas">
-            <button type="button" class="prompt-chip" data-question="Quiero opciones saludables para desayunar, sin gluten y con fibra">Desayuno sin gluten</button>
-            <button type="button" class="prompt-chip" data-question="¿Qué productos veganos ricos en proteína me recomiendas?">Proteína vegana</button>
-            <button type="button" class="prompt-chip" data-question="¿Qué bebidas o infusiones naturales tienen un perfil funcional?">Bebidas funcionales</button>
-          </div>
-
-          <form id="query-form" class="query-form">
+          <form id="query-form" class="sr-only" aria-hidden="true">
             <label class="field">
               <span>Consulta</span>
               <textarea
@@ -297,9 +288,7 @@
             </div>
           </form>
 
-          <p id="status" class="status"></p>
-
-          <div class="assistant-results">
+          <div class="assistant-results sr-only" aria-hidden="true">
             <article class="panel panel-soft results-full">
               <div class="panel-subhead">
                 <p class="eyebrow">Sugerencia</p>

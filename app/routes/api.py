@@ -1,7 +1,8 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 
 from app.services.llm_service import build_answer
 from app.services.rag_service import build_context_block, search_semantic_chunks
+from app.services.speech_service import build_speech_audio
 from app.services.transcription_service import transcribe_audio_bytes
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
@@ -77,3 +78,21 @@ def transcribe():
         return jsonify({"error": "No se ha podido transcribir el audio en este momento."}), 502
 
     return jsonify({"text": transcript})
+
+
+@api_bp.route("/speak", methods=["POST"])
+def speak():
+    payload = request.get_json(silent=True) or {}
+    text = (payload.get("text") or "").strip()
+
+    if not text:
+        return jsonify({"error": "El campo 'text' es obligatorio."}), 400
+
+    try:
+        audio_bytes = build_speech_audio(text)
+    except (ValueError, RuntimeError) as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception:
+        return jsonify({"error": "No se ha podido generar el audio en este momento."}), 502
+
+    return Response(audio_bytes, mimetype="audio/mpeg")

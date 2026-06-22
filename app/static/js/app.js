@@ -7,6 +7,8 @@ const questionInput = document.getElementById("question");
 const topKInput = document.getElementById("top-k");
 const submitButton = document.getElementById("submit-button");
 const statusOutput = document.getElementById("status");
+const answerPreviewOutput = document.getElementById("voice-answer-preview");
+const replayButton = document.getElementById("replay-button");
 const answerOutput = document.getElementById("answer-output");
 const contextOutput = document.getElementById("context-output");
 const resultsOutput = document.getElementById("results-output");
@@ -28,12 +30,20 @@ const checkoutButtons = document.querySelectorAll(".cart-checkout-button");
 
 let lastAnswer = "";
 let activeUtterance = null;
+let activeAudioPlayback = null;
+let audioContext = null;
+let activeAudioSource = null;
 let availableVoices = [];
 let activeRecognition = null;
 let activeMediaRecorder = null;
 let activeMediaStream = null;
 let recordedChunks = [];
 let isListening = false;
+let isProcessingAssistant = false;
+let latestAssistantRunId = 0;
+let latestPlaybackToken = 0;
+let lastAutoplayRunId = 0;
+let pendingNavigationPath = "";
 const cart = loadCart();
 let activeFilter = "all";
 const DEFAULT_VOICE_RATE = 1;
@@ -100,6 +110,138 @@ function updateNavState(filter) {
 
 function formatPrice(value) {
   return `${value.toFixed(2)} EUR`;
+}
+
+function normalizeText(value) {
+  return (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildProductCatalog() {
+  const items = new Map();
+
+  addToCartButtons.forEach((button) => {
+    const id = String(button.dataset.productId || "");
+    if (!id || items.has(id)) {
+      return;
+    }
+
+    const name = button.dataset.productName || "Producto";
+    items.set(id, {
+      id,
+      name,
+      normalizedName: normalizeText(name),
+      price: Number.parseFloat(button.dataset.productPrice || "0"),
+    });
+  });
+
+  return Array.from(items.values());
+}
+
+function extractRequestedQuantity(question) {
+  const normalizedQuestion = normalizeText(question);
+  const numericMatch = normalizedQuestion.match(/\b(\d+)\b/);
+  if (numericMatch) {
+    return Math.max(1, Number.parseInt(numericMatch[1], 10));
+  }
+
+  const quantityMap = new Map([
+    ["un", 1],
+    ["uno", 1],
+    ["una", 1],
+    ["dos", 2],
+    ["tres", 3],
+    ["cuatro", 4],
+    ["cinco", 5],
+    ["seis", 6],
+  ]);
+
+  for (const [word, quantity] of quantityMap.entries()) {
+    if (normalizedQuestion.includes(` ${word} `) || normalizedQuestion.startsWith(`${word} `) || normalizedQuestion.endsWith(` ${word}`)) {
+      return quantity;
+    }
+  }
+
+  return 1;
+}
+
+function findRequestedProduct(question) {
+  const normalizedQuestion = normalizeText(question);
+  const catalog = buildProductCatalog();
+
+  return catalog
+    .filter((product) => normalizedQuestion.includes(product.normalizedName))
+    .sort((left, right) => right.normalizedName.length - left.normalizedName.length)[0] || null;
+}
+
+function addProductToCartByIntent(product, quantity) {
+  const existing = cart.get(product.id);
+
+  if (existing) {
+    existing.quantity += quantity;
+  } else {
+    cart.set(product.id, {
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      quantity,
+    });
+  }
+
+  renderCart();
+}
+
+function resolveAssistantIntent(question) {
+  const normalizedQuestion = ` ${normalizeText(question)} `;
+  const wantsAddToCart =
+    /\b(agrega|agregar|anade|añade|mete|meter|pon|poner|quiero)\b/.test(normalizedQuestion)
+    && /\b(carrito|cesta)\b/.test(normalizedQuestion);
+  const wantsCartPage =
+    /\b(carrito|cesta)\b/.test(normalizedQuestion)
+    && /\b(ir|vamos|lleva|llevame|abrir|abre|ver|mostrar|ensena|enseña)\b/.test(normalizedQuestion);
+  const wantsCheckout =
+    /\b(finalizar compra|tramitar pedido|checkout|pagar)\b/.test(normalizedQuestion);
+
+  if (wantsAddToCart) {
+    const product = findRequestedProduct(question);
+    if (!product) {
+      return {
+        handled: true,
+        answer: "No he encontrado ese producto en el catálogo visible. Pídemelo con el nombre exacto y lo añado al carrito.",
+      };
+    }
+
+    const quantity = extractRequestedQuantity(question);
+    addProductToCartByIntent(product, quantity);
+
+    return {
+      handled: true,
+      answer: `${quantity === 1 ? "He añadido" : `He añadido ${quantity} unidades de`} ${quantity === 1 ? product.name : product.name} al carrito.`,
+    };
+  }
+
+  if (wantsCheckout) {
+    return {
+      handled: true,
+      answer: "Te llevo al resumen del pedido para finalizar la compra.",
+      navigateTo: "/carrito#cart-summary",
+    };
+  }
+
+  if (wantsCartPage) {
+    return {
+      handled: true,
+      answer: "Te llevo a la página del carrito.",
+      navigateTo: "/carrito",
+    };
+  }
+
+  return { handled: false };
 }
 
 function renderCartCount() {
@@ -275,8 +417,77 @@ function browserSupportsSpeech() {
   return "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
 }
 
+function browserSupportsAudioContext() {
+  return Boolean(window.AudioContext || window.webkitAudioContext);
+}
+
+async function primeAudioPlayback() {
+  if (!browserSupportsAudioContext()) {
+    return;
+  }
+
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!audioContext) {
+    audioContext = new AudioContextClass();
+  }
+
+  if (audioContext.state === "suspended") {
+    await audioContext.resume();
+  }
+}
+
 function browserSupportsRecognition() {
   return Boolean(getSpeechRecognitionClass());
+}
+
+function setStatus(message) {
+  if (statusOutput) {
+    statusOutput.textContent = message;
+  }
+}
+
+function setAnswerPreview(message) {
+  if (answerPreviewOutput) {
+    answerPreviewOutput.textContent = message;
+  }
+}
+
+function setReplayVisibility(visible) {
+  if (!replayButton) {
+    return;
+  }
+
+  replayButton.hidden = !visible;
+  replayButton.disabled = !visible || !lastAnswer;
+}
+
+function setMicrophoneState(state) {
+  if (!listenButton) {
+    return;
+  }
+
+  listenButton.classList.remove("is-listening", "is-processing", "is-speaking");
+
+  if (state === "listening" || state === "processing" || state === "speaking") {
+    listenButton.classList.add(`is-${state}`);
+  }
+
+  const labels = {
+    idle: "Toca para hablar con el asistente",
+    listening: "El asistente está escuchando tu consulta",
+    processing: "El asistente está preparando la respuesta",
+    speaking: "El asistente está respondiendo en voz alta",
+  };
+
+  const titles = {
+    idle: "Toca para hablar",
+    listening: "Escuchando",
+    processing: "Procesando consulta",
+    speaking: "Respondiendo",
+  };
+
+  listenButton.setAttribute("aria-label", labels[state] || labels.idle);
+  listenButton.setAttribute("title", titles[state] || titles.idle);
 }
 
 function fillVoiceOptions() {
@@ -315,10 +526,8 @@ function stopListening() {
   recordedChunks = [];
 
   isListening = false;
-  if (listenButton) {
-    listenButton.innerHTML = '<span aria-hidden="true">🎤</span>';
-    listenButton.setAttribute("aria-label", "Hablar pregunta");
-    listenButton.setAttribute("title", browserSupportsAudioRecording() ? "Iniciar grabacion" : "Hablar pregunta");
+  if (!isProcessingAssistant && !activeUtterance) {
+    setMicrophoneState("idle");
   }
 }
 
@@ -359,7 +568,7 @@ async function stopAudioRecording() {
     return;
   }
 
-  statusOutput.textContent = "Procesando audio...";
+  setStatus("Procesando audio...");
 
   const audioBlob = await new Promise((resolve, reject) => {
     recorder.onstop = () => {
@@ -379,19 +588,29 @@ async function stopAudioRecording() {
   activeMediaRecorder = null;
 
   try {
+    if (!audioBlob.size) {
+      throw new Error("No se ha podido capturar audio. Mantén pulsado el micrófono un poco más.");
+    }
+
     const transcript = await transcribeRecordedAudio(audioBlob);
-    questionInput.value = transcript;
-    statusOutput.textContent = "Consulta transcrita. Pulsa buscar.";
-    questionInput.focus();
+    if (questionInput) {
+      questionInput.value = transcript;
+    }
+
+    if (!transcript.trim()) {
+      setStatus("No se ha transcrito ningún texto.");
+      setMicrophoneState("idle");
+      return;
+    }
+
+    await runAssistantQuery(transcript);
   } catch (error) {
-    statusOutput.textContent = error.message;
+    setStatus(error.message);
   } finally {
     recordedChunks = [];
     isListening = false;
-    if (listenButton) {
-      listenButton.innerHTML = '<span aria-hidden="true">🎤</span>';
-      listenButton.setAttribute("aria-label", "Hablar pregunta");
-      listenButton.setAttribute("title", browserSupportsAudioRecording() ? "Iniciar grabacion" : "Hablar pregunta");
+    if (!isProcessingAssistant && !activeUtterance) {
+      setMicrophoneState("idle");
     }
   }
 }
@@ -419,23 +638,19 @@ async function startAudioRecording() {
       }
     };
 
-    recorder.start();
-    if (listenButton) {
-      listenButton.innerHTML = '<span aria-hidden="true">■</span>';
-      listenButton.setAttribute("aria-label", "Detener grabacion");
-      listenButton.setAttribute("title", "Detener grabacion");
-    }
-    statusOutput.textContent = "Grabando tu consulta. Pulsa otra vez para detener.";
+    recorder.start(250);
+    setMicrophoneState("listening");
+    setStatus("Escuchando tu consulta...");
   } catch (error) {
     stopListening();
-    statusOutput.textContent = "No se ha podido acceder al micrófono.";
+    setStatus("No se ha podido acceder al micrófono.");
   }
 }
 
 function startListening() {
   const RecognitionClass = getSpeechRecognitionClass();
 
-  if (!statusOutput || !questionInput) {
+  if (!listenButton || isProcessingAssistant) {
     return;
   }
 
@@ -448,127 +663,346 @@ function startListening() {
     return;
   }
 
-  if (browserSupportsAudioRecording()) {
-    startAudioRecording();
+  if (RecognitionClass) {
+    const recognition = new RecognitionClass();
+    activeRecognition = recognition;
+    isListening = true;
+
+    const originalQuestion = questionInput.value.trim();
+
+    recognition.lang = "es-ES";
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;
+
+    recognition.onstart = () => {
+      setMicrophoneState("listening");
+      setStatus("Escuchando tu consulta...");
+    };
+
+    recognition.onresult = (event) => {
+      let transcript = "";
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        transcript += event.results[index][0].transcript;
+      }
+
+      questionInput.value = transcript.trim();
+      setStatus("Transcribiendo consulta...");
+
+      const latestResult = event.results[event.results.length - 1];
+      if (latestResult?.isFinal) {
+        recognition.stop();
+      }
+    };
+
+    recognition.onspeechend = () => {
+      setStatus("Procesando audio...");
+      recognition.stop();
+    };
+
+    recognition.onerror = (event) => {
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        setStatus("No se ha concedido acceso al micrófono.");
+      } else if (event.error === "no-speech") {
+        questionInput.value = originalQuestion;
+        setStatus("No se ha detectado voz.");
+      } else {
+        setStatus("No se ha podido procesar el dictado.");
+      }
+
+      stopListening();
+    };
+
+    recognition.onend = async () => {
+      activeRecognition = null;
+      isListening = false;
+
+      if (questionInput.value.trim()) {
+        await runAssistantQuery(questionInput.value.trim());
+      } else {
+        setStatus("No se ha transcrito ningún texto.");
+        setMicrophoneState("idle");
+      }
+    };
+
+    recognition.start();
     return;
   }
 
-  if (!RecognitionClass) {
+  if (!browserSupportsAudioRecording()) {
     statusOutput.textContent = "Tu navegador no permite grabar audio desde esta pagina.";
     return;
   }
-
-  const recognition = new RecognitionClass();
-  activeRecognition = recognition;
-  isListening = true;
-
-  recognition.lang = "es-ES";
-  recognition.interimResults = true;
-  recognition.maxAlternatives = 1;
-  recognition.continuous = false;
-
-  const originalQuestion = questionInput.value.trim();
-
-  recognition.onstart = () => {
-    if (listenButton) {
-      listenButton.innerHTML = '<span aria-hidden="true">■</span>';
-      listenButton.setAttribute("aria-label", "Detener dictado");
-      listenButton.setAttribute("title", "Detener dictado");
-    }
-    statusOutput.textContent = "Escuchando tu consulta...";
-  };
-
-  recognition.onresult = (event) => {
-    let transcript = "";
-    for (let index = event.resultIndex; index < event.results.length; index += 1) {
-      transcript += event.results[index][0].transcript;
-    }
-
-    questionInput.value = transcript.trim();
-    statusOutput.textContent = "Transcribiendo consulta...";
-
-    const latestResult = event.results[event.results.length - 1];
-    if (latestResult?.isFinal) {
-      recognition.stop();
-    }
-  };
-
-  recognition.onspeechend = () => {
-    statusOutput.textContent = "Procesando audio...";
-    recognition.stop();
-  };
-
-  recognition.onerror = (event) => {
-    if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-      statusOutput.textContent = "No se ha concedido acceso al micrófono.";
-    } else if (event.error === "no-speech") {
-      questionInput.value = originalQuestion;
-      statusOutput.textContent = "No se ha detectado voz.";
-    } else {
-      statusOutput.textContent = "No se ha podido procesar el dictado.";
-    }
-
-    stopListening();
-  };
-
-  recognition.onend = () => {
-    activeRecognition = null;
-    isListening = false;
-    if (listenButton) {
-      listenButton.innerHTML = '<span aria-hidden="true">🎤</span>';
-      listenButton.setAttribute("aria-label", "Hablar pregunta");
-      listenButton.setAttribute("title", "Hablar pregunta");
-    }
-
-    if (questionInput.value.trim()) {
-      statusOutput.textContent = "Consulta transcrita. Pulsa buscar.";
-      questionInput.focus();
-    } else {
-      statusOutput.textContent = "No se ha transcrito ningún texto.";
-    }
-  };
-
-  recognition.start();
+  startAudioRecording();
 }
 
 function stopSpeech() {
+  latestPlaybackToken += 1;
+  pendingNavigationPath = "";
+
+  if (activeAudioSource) {
+    activeAudioSource.onended = null;
+    activeAudioSource.stop();
+    activeAudioSource.disconnect();
+    activeAudioSource = null;
+  }
+
+  if (activeAudioPlayback) {
+    activeAudioPlayback.pause();
+    activeAudioPlayback.src = "";
+    activeAudioPlayback = null;
+  }
+
   if (browserSupportsSpeech()) {
     window.speechSynthesis.cancel();
   }
   activeUtterance = null;
-  if (speakButton) {
-    speakButton.innerHTML = '<span aria-hidden="true">🔊</span>';
-    speakButton.setAttribute("aria-label", "Reproducir respuesta");
-    speakButton.setAttribute("title", "Reproducir respuesta");
+  if (!isListening && !isProcessingAssistant) {
+    setMicrophoneState("idle");
   }
 }
 
-function speakLastAnswer() {
-  if (!lastAnswer || !browserSupportsSpeech() || !speakButton) {
+async function playServerAudio(text, playbackToken) {
+  const response = await fetch("/api/speak", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ text }),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || "No se ha podido generar el audio.");
+  }
+
+  if (audioContext && audioContext.state !== "closed") {
+    const audioBuffer = await response.arrayBuffer();
+    if (playbackToken !== latestPlaybackToken) {
+      return;
+    }
+    const decodedBuffer = await audioContext.decodeAudioData(audioBuffer.slice(0));
+    if (playbackToken !== latestPlaybackToken) {
+      return;
+    }
+    const source = audioContext.createBufferSource();
+    source.buffer = decodedBuffer;
+    source.connect(audioContext.destination);
+    source.onended = () => {
+      if (playbackToken !== latestPlaybackToken) {
+        return;
+      }
+      activeAudioSource = null;
+      const navigationPath = pendingNavigationPath;
+      pendingNavigationPath = "";
+      if (!isProcessingAssistant && !isListening) {
+        setMicrophoneState("idle");
+        setStatus("Toca el micrófono para hablar.");
+      }
+      if (navigationPath) {
+        window.location.assign(navigationPath);
+      }
+    };
+    activeAudioSource = source;
+    setMicrophoneState("speaking");
+    setStatus("El asistente te está respondiendo...");
+    source.start(0);
     return;
   }
+
+  const audioBlob = await response.blob();
+  if (playbackToken !== latestPlaybackToken) {
+    return;
+  }
+  const audioUrl = URL.createObjectURL(audioBlob);
+  const audio = new Audio(audioUrl);
+
+  audio.onplay = () => {
+    if (playbackToken !== latestPlaybackToken) {
+      return;
+    }
+    setMicrophoneState("speaking");
+    setStatus("El asistente te está respondiendo...");
+  };
+  audio.onended = () => {
+    if (playbackToken !== latestPlaybackToken) {
+      URL.revokeObjectURL(audioUrl);
+      return;
+    }
+    URL.revokeObjectURL(audioUrl);
+    activeAudioPlayback = null;
+    const navigationPath = pendingNavigationPath;
+    pendingNavigationPath = "";
+    if (!isProcessingAssistant && !isListening) {
+      setMicrophoneState("idle");
+      setStatus("Toca el micrófono para hablar.");
+    }
+    if (navigationPath) {
+      window.location.assign(navigationPath);
+    }
+  };
+  audio.onerror = () => {
+    URL.revokeObjectURL(audioUrl);
+    activeAudioPlayback = null;
+    throw new Error("No se ha podido reproducir el audio generado.");
+  };
+
+  activeAudioPlayback = audio;
+  await audio.play();
+}
+
+async function speakLastAnswer({ force = false, runId = latestAssistantRunId } = {}) {
+  if (!lastAnswer) {
+    return;
+  }
+
+  if (!force && runId === lastAutoplayRunId) {
+    return;
+  }
+
+  if (activeUtterance || activeAudioPlayback || activeAudioSource) {
+    stopSpeech();
+    return;
+  }
+
+  if (!force) {
+    lastAutoplayRunId = runId;
+  }
+
+  latestPlaybackToken += 1;
+  const playbackToken = latestPlaybackToken;
+  await playServerAudio(lastAnswer, playbackToken);
+}
+
+async function presentAssistantResponse(answer, options = {}) {
+  lastAnswer = answer || "";
+  answerOutput.textContent = lastAnswer || "No hay una respuesta disponible para esta consulta.";
+  setAnswerPreview(lastAnswer || "No hay una respuesta disponible para esta consulta.");
+  if (replayButton) {
+    replayButton.disabled = !lastAnswer;
+  }
+  setReplayVisibility(false);
+  pendingNavigationPath = options.navigateTo || "";
+
+  if (!lastAnswer) {
+    setMicrophoneState("idle");
+    return;
+  }
+
+  setStatus("Respuesta lista. Te la leo ahora.");
+
+  try {
+    await speakLastAnswer({ runId: options.runId ?? latestAssistantRunId });
+  } catch (error) {
+    setStatus(`${error.message} Pulsa "Reproducir respuesta".`);
+    setReplayVisibility(true);
+    setMicrophoneState("idle");
+    if (pendingNavigationPath) {
+      window.location.assign(pendingNavigationPath);
+    }
+  }
+}
+
+async function runAssistantQuery(question) {
+  if (!question || !answerOutput || !contextOutput || !resultsOutput) {
+    return;
+  }
+
+  const localIntent = resolveAssistantIntent(question);
+  if (localIntent.handled) {
+    latestAssistantRunId += 1;
+    const assistantRunId = latestAssistantRunId;
+    setStatus("Ejecutando acción...");
+    contextOutput.textContent = "Acción resuelta desde la interfaz de compra.";
+    resultsOutput.innerHTML = "";
+    await presentAssistantResponse(localIntent.answer, {
+      navigateTo: localIntent.navigateTo,
+      runId: assistantRunId,
+    });
+    return;
+  }
+
+  const topK = Number.parseInt(topKInput?.value || "5", 10);
+  latestAssistantRunId += 1;
+  const assistantRunId = latestAssistantRunId;
+  isProcessingAssistant = true;
+  stopSpeech();
+  stopListening();
+  setMicrophoneState("processing");
+  setStatus("Buscando productos e información relacionada...");
+  setAnswerPreview("Preparando respuesta...");
+  setReplayVisibility(false);
+  answerOutput.textContent = "";
+  contextOutput.textContent = "";
+  resultsOutput.innerHTML = "";
+
+  try {
+    const response = await fetch("/api/query", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ question, top_k: topK }),
+    });
+
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || "Error desconocido");
+    }
+
+    if (assistantRunId !== latestAssistantRunId) {
+      return;
+    }
+    contextOutput.textContent = payload.context || "No hay información adicional disponible.";
+    renderResults(payload.results || []);
+    setStatus(
+      (payload.answer || "")
+        ? "Respuesta lista. Te la leo ahora."
+        : `${payload.retrieved_count} resultados utilizados para responder.`,
+    );
+
+    await presentAssistantResponse(payload.answer || "", { runId: assistantRunId });
+  } catch (error) {
+    lastAnswer = "";
+    answerOutput.textContent = "No se ha podido generar una respuesta.";
+    setAnswerPreview("No se ha podido generar una respuesta.");
+    contextOutput.textContent = "No se ha podido completar la consulta.";
+    resultsOutput.innerHTML = '<p class="placeholder">Inténtalo de nuevo en unos segundos.</p>';
+    setStatus(error.message);
+    setMicrophoneState("idle");
+    setReplayVisibility(false);
+  } finally {
+    isProcessingAssistant = false;
+  }
+}
+
+async function handleMicrophoneClick(event) {
+  event.preventDefault();
+
+  if (isProcessingAssistant) {
+    return;
+  }
+
+  await primeAudioPlayback();
 
   if (activeUtterance) {
     stopSpeech();
     return;
   }
 
-  const utterance = new SpeechSynthesisUtterance(lastAnswer);
-  const selectedVoice = availableVoices.find((voice) => voice.default)
-    || availableVoices.find((voice) => voice.lang.toLowerCase().startsWith("es"))
-    || availableVoices[0];
-  utterance.lang = selectedVoice?.lang || "es-ES";
-  utterance.rate = DEFAULT_VOICE_RATE;
-  if (selectedVoice) {
-    utterance.voice = selectedVoice;
+  if (isListening) {
+    if (activeMediaRecorder) {
+      stopAudioRecording();
+    } else if (activeRecognition) {
+      activeRecognition.stop();
+    } else {
+      stopListening();
+    }
+    return;
   }
-  utterance.onend = stopSpeech;
-  utterance.onerror = stopSpeech;
-  activeUtterance = utterance;
-  speakButton.innerHTML = '<span aria-hidden="true">■</span>';
-  speakButton.setAttribute("aria-label", "Detener audio");
-  speakButton.setAttribute("title", "Detener audio");
-  window.speechSynthesis.speak(utterance);
+
+  startListening();
 }
 
 filterButtons.forEach((button) => {
@@ -588,26 +1022,11 @@ addToCartButtons.forEach((button) => {
   button.addEventListener("click", () => addToCart(button));
 });
 
-promptChips.forEach((chip) => {
-  chip.addEventListener("click", () => {
-    if (!questionInput) {
-      return;
-    }
-    questionInput.value = chip.dataset.question || "";
-    questionInput.focus();
-  });
-});
-
-speakButton?.addEventListener("click", speakLastAnswer);
-listenButton?.addEventListener("click", startListening);
-
 if (browserSupportsSpeech()) {
   fillVoiceOptions();
   if (typeof window.speechSynthesis.onvoiceschanged !== "undefined") {
     window.speechSynthesis.onvoiceschanged = fillVoiceOptions;
   }
-} else if (speakButton) {
-  speakButton.disabled = true;
 }
 
 if (!browserSupportsRecognition() && listenButton) {
@@ -617,58 +1036,38 @@ if (!browserSupportsRecognition() && listenButton) {
   }
 }
 
+if (listenButton) {
+  listenButton.addEventListener("click", handleMicrophoneClick);
+}
+
+replayButton?.addEventListener("click", async () => {
+  if (!lastAnswer) {
+    return;
+  }
+
+  try {
+    await primeAudioPlayback();
+    setReplayVisibility(true);
+    await speakLastAnswer({ force: true });
+  } catch (error) {
+    setStatus(error.message);
+  }
+});
+
 if (form && questionInput && topKInput && submitButton && statusOutput && answerOutput && contextOutput && resultsOutput) {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const question = questionInput.value.trim();
-    const topK = Number.parseInt(topKInput.value, 10);
 
     if (!question) {
-      statusOutput.textContent = "Escribe o dicta una consulta para continuar.";
+      setStatus("Escribe o dicta una consulta para continuar.");
       return;
     }
 
-    stopSpeech();
-    stopListening();
-    submitButton.disabled = true;
-    if (speakButton) {
-      speakButton.disabled = true;
-    }
-    statusOutput.textContent = "Buscando productos e información relacionada...";
-    answerOutput.textContent = "";
-    contextOutput.textContent = "";
-    resultsOutput.innerHTML = "";
-
     try {
-      const response = await fetch("/api/query", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ question, top_k: topK }),
-      });
-
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.error || "Error desconocido");
-      }
-
-      lastAnswer = payload.answer || "";
-      answerOutput.textContent = lastAnswer || "No hay una respuesta disponible para esta consulta.";
-      contextOutput.textContent = payload.context || "No hay información adicional disponible.";
-      renderResults(payload.results || []);
-      statusOutput.textContent = `${payload.retrieved_count} resultados utilizados para responder.`;
-      if (speakButton) {
-        speakButton.disabled = !lastAnswer || !browserSupportsSpeech();
-      }
-    } catch (error) {
-      lastAnswer = "";
-      answerOutput.textContent = "No se ha podido generar una respuesta.";
-      contextOutput.textContent = "No se ha podido completar la consulta.";
-      resultsOutput.innerHTML = '<p class="placeholder">Inténtalo de nuevo en unos segundos.</p>';
-      statusOutput.textContent = error.message;
+      submitButton.disabled = true;
+      await runAssistantQuery(question);
     } finally {
       submitButton.disabled = false;
     }
